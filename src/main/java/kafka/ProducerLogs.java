@@ -63,7 +63,7 @@ public class ProducerLogs {
                     while ((line = inputStream.readLine()) != null) {
 //                        System.out.println(line);
                         if (isAsync) {
-                            producer.send(new ProducerRecord<>(topic, line), new ProdcucerCallback());
+                            producer.send(new ProducerRecord<>(topic, line), new ProducerCallback());
                         }
                         else {
                             Future<RecordMetadata> future = producer.send(new ProducerRecord<>(topic, line));

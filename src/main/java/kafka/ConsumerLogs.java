@@ -14,16 +14,16 @@ import static org.apache.spark.sql.functions.*;
 public class ConsumerLogs {
     private SparkSession spark;
 
-    private static final String destination = "hdfs://m1:8020/project2/result";
+    private static final String destination = "hdfs://192.168.56.111:8020/web_logs/result";
 
-    private static final String KAFKA_SERVER = "m1:9092,m2:9092";
+    private static final String KAFKA_SERVER = "192.168.56.111:9092,192.168.56.113:9092";
 
     private static final String topic = "sample-data";
 
     /**
      * Nơi lưu trữ dữ liệu đọc từ Kafka.
      */
-    private final String destinationPath = "/project2/data";
+    private final String destinationPath = "/web_logs/data";
 
     /**
      * Lưu giữ các điểm kiểm tra phục vụ cho việc phục hồi dữ liệu.
@@ -79,26 +79,26 @@ public class ConsumerLogs {
 
 //        df.write().partitionBy("year", "month", "day").parquet(destinationPath);
 
-        try {
-            df.writeStream()
-                    .trigger(Trigger.ProcessingTime("1 minute"))
-                    .format("console")
-                    .outputMode("append")
-                    .option("truncate", false)
-                    .start()
-                    .awaitTermination();
-        } catch (StreamingQueryException e) {
-            throw new RuntimeException(e);
-        } catch (TimeoutException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            df.writeStream()
+//                    .trigger(Trigger.ProcessingTime("1 minute"))
+//                    .format("console")
+//                    .outputMode("append")
+//                    .option("truncate", false)
+//                    .start()
+//                    .awaitTermination();
+//        } catch (StreamingQueryException e) {
+//            throw new RuntimeException(e);
+//        } catch (TimeoutException e) {
+//            throw new RuntimeException(e);
+//        }
 
         try {
             df.coalesce(1).writeStream()
                     .trigger(Trigger.ProcessingTime("1 minute"))
                     .partitionBy("year", "month", "day")
                     .format("parquet")
-                    .option("path", destinationPath + "2")
+                    .option("path", destinationPath)
                     .option("checkpointLocation", checkpoint)
                     .outputMode("append")
                     .start()

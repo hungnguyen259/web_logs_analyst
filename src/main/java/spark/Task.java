@@ -1,9 +1,11 @@
 package spark;
 
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SaveMode;
-import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.apache.spark.sql.functions.*;
 import static org.apache.spark.sql.functions.col;
@@ -11,61 +13,62 @@ import static org.apache.spark.sql.functions.col;
 public class Task {
     private SparkSession spark;
 
-    private static final String destination = "hdfs://m1:8020/project2/result";
+    private static final String destination = "hdfs://192.168.56.111:8020/web_logs/result";
 
-    private final String source = "/project2/data";
+    private final String source = "/web_logs/data";
 
-    /**
-     * Lấy url đã truy cập nhiều nhất trong ngày của mỗi guid
-     *
-     * @param data
-     */
-    public void exe1(Dataset<Row> data) {
-        Dataset<Row> data1 = data.groupBy("guid", "domain").count();
-//        data1.show();
-        Dataset<Row> data2 = data1.groupBy("guid").agg(max("count").as("max"));
-//        data2.show();
+    private void writeToParquet(Dataset<Row> dataset,String path){
+        dataset.write().parquet(path);
+    }
+    private void topDomainByGuid(Dataset<Row> df){
+        //Lấy top 5 domain có số lượng GUID nhiều nhất.
+        Dataset<Row> res1 = df
+                .select(col("domain").cast("String"),col("guid"))
+                .groupBy(col("domain"))
+                .agg(count("guid"))
+                .orderBy(col("count(guid)").desc())
+                .limit(5);
 
-        data1.createOrReplaceTempView("data1");
-        data2.createOrReplaceTempView("data2");
+        res1=res1.withColumnRenamed("count(guid)","NumberOfGuids");
+        res1.write().option("delimiter", ";").option("header", "true").mode(SaveMode.Overwrite).csv(destination + "/topDomainByGuid");
+    }
+    private void topLocationByGuid(Dataset<Row> df){
+        //Lấy top 5 vị trí địa lý có nhiều GUID truy cập nhất. Vị trí địa lý sử dụng trường locid >1.
 
-        Dataset<Row> data3 = spark.sql("SELECT data1.guid, data1.domain FROM data1 INNER JOIN data2 ON data1.guid = data2.guid AND data1.count = data2.max");
-        System.out.println("Lấy url đã truy cập nhiều nhất trong ngày của mỗi guid");
-        data3.show(false);
 
-        // lưu lại kết quả
-//        data3.write().parquet(resultPath + "/exe1");
-        data3.write().option("delimiter", ";").option("header", "true").mode(SaveMode.Overwrite).csv(destination + "/ex1");
+        Dataset<Row> res2=df.filter("locid>1")
+                .select(col("locid"),col("guid"))
+                .groupBy(col("locid"))
+                .agg(count("guid"))
+                .orderBy(col("count(guid)").desc())
+                .limit(5);
+
+        res2=res2.withColumnRenamed("count(guid)","NumberOfGuids");
+        res2.write().option("delimiter", ";").option("header", "true").mode(SaveMode.Overwrite).csv(destination + "/topLocationByGuid");
     }
 
-    /**
-     * Các IP được sử dụng bởi nhiều guid nhất số guid không tính lặp lại
-     *
-     * @param data
-     */
-    public void exe2(Dataset<Row> data) {
-        Dataset<Row> data1 = data.groupBy("ip").agg(count_distinct(col("guid")).as("count")).orderBy(col("count").desc());
-        System.out.println("Các IP được sử dụng bởi nhiều guid nhất");
-        data1.show(false);
+    private void GGFBRate(Dataset<Row> df){
+        //Tính tỉ lệ pageview phát sinh từ google, fb.
 
-//        data1.write().parquet(resultPath + "/exe2");
-        data1.write().option("delimiter", ";").option("header", "true").mode(SaveMode.Overwrite).csv(destination + "/ex2");
-    }
+        //@pageViewGoogle: Lưu số bản ghi phát sinh từ Google
+        long pageViewGoogle = df.select(col("refer").cast("String"))
+                .filter(col("refer")
+                        .rlike("google.com|com.google")).count();
+        //@pageViewFacebook: Lưu số bản ghi phát sinh từ Facebook
+        long pageViewFacebook =  df.select(col("refer").cast("String"))
+                .filter(col("refer")
+                        .rlike("facebook.com")).count();
+        //@total: Lưu tổng số bản ghi
+        long total=df.count();
+        StructType structType = new StructType();
+        structType = structType.add("source", DataTypes.StringType, false);
+        structType = structType.add("rate", DataTypes.DoubleType, false);
 
-    /**
-     * Tính các guid mà có timeCreate – cookieCreate nhỏ hơn 30 phút
-     *
-     * @param data
-     */
-    public void exe3(Dataset<Row> data) {
-        Dataset<Row> data1 = data.select(col("guid")
-                , col("timeCreate").cast("long").minus(col("cookieCreate").cast("long")).as("duration"));
-        data1 = data1.filter(col("duration").lt(30 * 60000));
-        System.out.println("Tính các guid mà có timeCreate – cookieCreate nhỏ hơn 30 phút");
-        data1.show(false);
-
-//        data1.write().parquet(resultPath + "/exe3");
-        data1.write().option("delimiter", ";").option("header", "true").mode(SaveMode.Overwrite).csv(destination + "/ex3");
+        List<Row> nums = new ArrayList<Row>();
+        nums.add(RowFactory.create("Google", (pageViewGoogle*1.0/total)*100));
+        nums.add(RowFactory.create("Facebook", (pageViewFacebook*1.0/total)*100));
+        Dataset<Row> res3 = spark.createDataFrame(nums, structType);
+        res3.write().option("delimiter", ";").option("header", "true").mode(SaveMode.Overwrite).csv(destination + "/GGFBRate");
     }
 
     public  void run() {
@@ -77,9 +80,9 @@ public class Task {
 
         Dataset<Row> df = spark.read().parquet(source);
 //        df.show(false);
-        exe1(df);
-        exe2(df);
-        exe3(df);
+        topDomainByGuid(df);
+        topLocationByGuid(df);
+        GGFBRate(df);
     }
 
     public static void main(String[] args) {
