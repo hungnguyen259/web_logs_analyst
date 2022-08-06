@@ -13,7 +13,7 @@ import static org.apache.spark.sql.functions.col;
 public class Task {
     private SparkSession spark;
 
-    private static final String destination = "hdfs://192.168.56.111:8020/web_logs/result";
+    private static final String destination = "hdfs://internship-hadoop107203:8020/web_logs/result";
 
     private final String source = "/web_logs/data";
 

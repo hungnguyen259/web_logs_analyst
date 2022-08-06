@@ -17,7 +17,7 @@ public class ProducerLogs {
     private final String topic;
     private final Boolean isAsync;
 
-    public static final String KAFKA_SERVER = "192.168.56.111:9092,192.168.56.113:9092";
+    public static final String KAFKA_SERVER = "internship-hadoop10561:14040,internship-hadoop105185:14040,internship-hadoop107203:14040";
     public static final String CLIENT_ID = "SampleProducer";
 
     /**

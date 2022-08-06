@@ -14,9 +14,9 @@ import static org.apache.spark.sql.functions.*;
 public class ConsumerLogs {
     private SparkSession spark;
 
-    private static final String destination = "hdfs://192.168.56.111:8020/web_logs/result";
+    //private static final String destination = "hdfs://192.168.56.111:8020/web_logs/result";
 
-    private static final String KAFKA_SERVER = "192.168.56.111:9092,192.168.56.113:9092";
+    private static final String KAFKA_SERVER = "internship-hadoop10561:14040,internship-hadoop105185:14040,internship-hadoop107203:14040";
 
     private static final String topic = "sample-data";
 
